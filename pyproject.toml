@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "provenance"
+version = "0.1.0"
+description = "Audio provenance & authenticity checker: true bit depth, lossy-transcode detection, and likely origin platform."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Ghaith Altemimi" }]
+keywords = ["audio", "flac", "lossless", "transcode", "hires", "forensics"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Multimedia :: Sound/Audio :: Analysis",
+]
+dependencies = ["numpy"]
+
+[project.scripts]
+provenance = "provenance.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/temirvvs/provenance"
+Repository = "https://github.com/temirvvs/provenance"
+
+[tool.setuptools]
+packages = ["provenance"]

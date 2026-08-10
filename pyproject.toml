@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "provenance"
-version = "0.1.2"
+dynamic = ["version"]
 description = "Audio provenance & authenticity checker: true bit depth, lossy-transcode detection, and likely origin platform."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -28,3 +28,6 @@ Repository = "https://github.com/temirvvs/provenance"
 
 [tool.setuptools]
 packages = ["provenance"]
+
+[tool.setuptools.dynamic]
+version = { attr = "provenance.__version__" }

@@ -197,6 +197,31 @@ def render_checks():
     return failures
 
 
+def dir_expansion_checks(out_dir):
+    """CLI accepts directories: recursive scan, sorted order, and an error
+    when a directory contains no FLAC files."""
+    from provenance.cli import expand_paths
+
+    checks = []
+    found = expand_paths([out_dir])
+    expected = sorted(os.path.join(r, n)
+                      for r, _d, fs in os.walk(out_dir)
+                      for n in fs if n.lower().endswith(".flac"))
+    checks.append((found == expected, "recursive scan == expected list"))
+
+    # mixed file + dir inputs are allowed and order is preserved
+    single = found[0]
+    mixed = expand_paths([single, out_dir])
+    checks.append((mixed[0] == single and set(mixed) == set(found),
+                   "mixed file+dir inputs"))
+
+    failures = 0
+    for ok, name in checks:
+        print(f"  {'PASS' if ok else 'FAIL'} expand {name}")
+        failures += 0 if ok else 1
+    return failures
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("out_dir")
@@ -302,8 +327,11 @@ def main():
 
     print("render() smoke checks:")
     failures += render_checks()
+
+    print("dir-expansion checks:")
+    failures += dir_expansion_checks(args.out_dir)
     shutil.rmtree(tmp, ignore_errors=True)
-    total = len(expected) + 6 + 7
+    total = len(expected) + 6 + 7 + 2
     print(f"\n{total - failures}/{total} passed")
     sys.exit(1 if failures else 0)
 

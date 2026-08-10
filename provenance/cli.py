@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 import sys
 
 from . import __version__
@@ -151,6 +152,21 @@ def render(result, st):
     return "\n".join(lines)
 
 
+def expand_paths(args):
+    """Accept files and/or directories. Directories are scanned recursively
+    for FLAC files, preserving a deterministic (sorted) order."""
+    paths = []
+    for a in args:
+        if os.path.isdir(a):
+            for root, _dirs, files in os.walk(a):
+                for name in sorted(files):
+                    if name.lower().endswith(".flac"):
+                        paths.append(os.path.join(root, name))
+        else:
+            paths.append(a)
+    return paths
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="provenance",
@@ -158,7 +174,8 @@ def main(argv=None):
                     "detection, and likely origin platform.",
     )
     parser.add_argument("files", nargs="+", metavar="FILE",
-                        help="audio files to analyze")
+                        help="audio files (or directories scanned for "
+                             "*.flac recursively)")
     parser.add_argument("--json", action="store_true",
                         help="emit machine-readable JSON")
     parser.add_argument("--fft", type=int, default=16384,
@@ -172,7 +189,11 @@ def main(argv=None):
     st = style_for(sys.stdout)
     results = []
     failed = False
-    for path in args.files:
+    paths = expand_paths(args.files)
+    if not paths:
+        print(st.red("no FLAC files found"), file=sys.stderr)
+        return 1
+    for path in paths:
         try:
             results.append(check(path))
         except ProbeError as e:

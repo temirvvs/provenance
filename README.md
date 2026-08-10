@@ -49,6 +49,7 @@ pip install -e .
 provenance track.flac             # human-readable report
 provenance --json track.flac      # machine-readable JSON (one object per file)
 provenance a.flac b.flac ...      # analyze multiple files
+provenance ~/music/               # scan a directory recursively for *.flac
 ```
 
 ### Example report

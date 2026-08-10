@@ -84,6 +84,27 @@ def spectrum_metrics(power, binw):
         y = db[lo_i:hi_i]
         slope = float(np.polyfit(x, y, 1)[0])
 
+    # Transition width of the lowpass anchored at the steepest drop. A lossy
+    # codec applies a near-ideal filter: passband -> silence within ~2 kHz at a
+    # standardized knee. A producer-darkened master uses a real EQ: the -6 dB
+    # to -60 dB rolloff spans several kHz (or never fully closes), and the
+    # knee is wherever the mix puts it. That is the codec-vs-dark-master split.
+    trans = 0.0
+    if cliff_at > 8000.0:
+        lo_i = max(1, int((cliff_at - 2000.0) / binw))
+        hi_i = max(lo_i + 1, int((cliff_at - 300.0) / binw))
+        if hi_i <= db.size:
+            shelf = float(np.median(db[lo_i:hi_i]))
+            i6 = i60 = None
+            for i in range(int(cliff_at / binw), db.size):
+                if i6 is None and db[i] < shelf - 6.0:
+                    i6 = i
+                if i6 is not None and db[i] < shelf - 60.0:
+                    i60 = i
+                    break
+            if i6 is not None:
+                trans = float((freqs[(i60 or db.size - 1)] - freqs[i6]) / 1000.0)
+
     return {
         "peak_db": float(db[idx65] if idx65 else db[0]),
         "cutoff65_hz": cutoff65,
@@ -94,6 +115,7 @@ def spectrum_metrics(power, binw):
         "brickwall_sharpness": sharpness,
         "max_cliff_db_per_khz": max_cliff,
         "cliff_at_hz": cliff_at,
+        "transition_khz": trans,
         "hf_slope_db_per_octave": slope,
         "top_band_db": float(db[-max(1, int(1000.0 / binw)):].max()) if db.size else -400,
     }

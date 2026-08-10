@@ -6,29 +6,48 @@ CUTOFF_BANDS = [
     (20500.0, "256-320 kbps MP3 / 256 kbps AAC / Vorbis q8-9 / Opus 192"),
 ]
 
+# Standardized codec lowpass knees. Real encoders use a near-ideal filter whose
+# -5..-60 dB transition spans only ~1-2 kHz and sits at one of these. A
+# producer-darkened master uses a real EQ: wide rolloff at an arbitrary knee.
+CODEC_KNEES = [16000.0, 16500.0, 20500.0]
 
-def classify(cutoff65, e16, e20, sharpness, is_lossless_container, genuine_24,
-             effective_bits, top_band_db, max_cliff, cliff_at):
+
+def classify(cutoff65, e16, genuine_24, top_band_db, max_cliff, cliff_at,
+             transition_khz=0.0):
     """Return (kind, detail). kind in {AUTHENTIC_LOSSLESS, TRANSCODE,
     POSSIBLE_TRANSCODE, AMBIGUOUS_HI_BITRATE}."""
     reasons = []
     top_empty = top_band_db < -85.0
     has_cliff = max_cliff >= 30.0
-    cliff_near_cutoff = abs(cliff_at - cutoff65) < 3000.0
+    # A lossy lowpass is a near-ideal filter: passband -> silence in under
+    # ~2 kHz. A real EQ lowpass (even a steep 48-96 dB/oct one) rolls off over
+    # several kHz. This is the discriminator between codec and dark master.
+    codec_like = 0.0 < transition_khz < 2.0
+    standard_knee = any(abs(cutoff65 - knee) < 1000.0 for knee in CODEC_KNEES)
 
     if has_cliff and top_empty:
-        if max_cliff >= 45.0 or cliff_near_cutoff:
+        if codec_like and (standard_knee or max_cliff >= 45.0):
             kind = "TRANSCODE"
             reasons.append(
-                f"hard lowpass brickwall: {max_cliff:.0f} dB drop in 1 kHz "
-                f"at {cliff_at:.0f} Hz right at the cutoff, with nothing "
-                f"above (top band {top_band_db:.0f} dB) -> lossy encode"
+                f"near-ideal lowpass brickwall: {max_cliff:.0f} dB drop in "
+                f"1 kHz at {cliff_at:.0f} Hz, transition only "
+                f"{transition_khz:.1f} kHz wide, nothing above (top band "
+                f"{top_band_db:.0f} dB) -> lossy encode"
             )
-        else:
+        elif codec_like:
             kind = "POSSIBLE_TRANSCODE"
             reasons.append(
-                f"steep lowpass (max {max_cliff:.0f} dB/kHz at "
-                f"{cliff_at:.0f} Hz) with empty top band"
+                f"near-ideal lowpass (transition {transition_khz:.1f} kHz) at "
+                f"non-standard cutoff {cliff_at:.0f} Hz; could be a codec or "
+                "a digital brickwall EQ"
+            )
+        else:
+            kind = "AMBIGUOUS_HI_BITRATE"
+            reasons.append(
+                f"steep-ish drop ({max_cliff:.0f} dB/kHz at "
+                f"{cliff_at:.0f} Hz) but the rolloff is {transition_khz:.1f} "
+                "kHz wide at a non-codec knee: consistent with an "
+                "intentionally dark/limited master, not a codec filter"
             )
         if cutoff65 >= 20500.0:
             reasons.append("cutoff near Nyquist; band hint is uncertain")
@@ -58,10 +77,3 @@ def classify(cutoff65, e16, e20, sharpness, is_lossless_container, genuine_24,
         f"no lossy brickwall (steepest drop {max_cliff:.0f} dB/kHz; "
         f"content persists to the top of the band, "
         f"{top_band_db:.0f} dB at Nyquist) -> genuine wideband signal", ]
-
-
-def describe(is_lossless_container, codec):
-    return {
-        "is_lossless_container": is_lossless_container,
-        "codec": codec,
-    }

@@ -12,9 +12,6 @@ from .verdict import classify
 from .platform import assess
 
 
-LOSSLESS = {"flac", "alac", "wav", "wave", "aiff", "aif", "ape", "wv"}
-
-
 def check(path):
     fmt, audio = probe(path)
     rate = int(float(audio.get("sample_rate", 0)))
@@ -23,7 +20,6 @@ def check(path):
                         or audio.get("bits_per_sample") or 0)
     codec = audio.get("codec_name", "")
     container = audio.get("codec_name", "") or fmt.get("format_name", "")
-    is_lossless = codec.lower() in LOSSLESS
     duration = float(fmt.get("duration", 0) or audio.get("duration", 0) or 0)
     size = os.path.getsize(path)
 
@@ -44,10 +40,9 @@ def check(path):
 
     kind, reasons = classify(
         spec["cutoff65_hz"], spec["energy_above_16k"],
-        spec["energy_above_20k"], spec["brickwall_sharpness"],
-        is_lossless, depth["verdict"] == "GENUINE_24",
-        usage["effective_bits"], spec["top_band_db"],
-        spec["max_cliff_db_per_khz"], spec["cliff_at_hz"],
+        depth["verdict"] == "GENUINE_24",
+        spec["top_band_db"], spec["max_cliff_db_per_khz"],
+        spec["cliff_at_hz"], spec["transition_khz"],
     )
 
     if kind == "AUTHENTIC_LOSSLESS" and depth["verdict"] == "PADDED_16_TO_24":

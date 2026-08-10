@@ -9,6 +9,9 @@ dist/
 .venv/
 venv/
 
+# Generated test fixtures
+fixtures/
+
 # OS / editor
 .DS_Store
 *.swp

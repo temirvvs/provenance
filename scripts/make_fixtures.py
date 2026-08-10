@@ -144,6 +144,59 @@ def classify_unit_checks():
     return failures
 
 
+def render_checks():
+    """Pin the CLI renderer: every verdict kind renders, colors off on plain
+    streams, and no candidate / md5 edge cases are handled."""
+    from provenance.cli import render
+    from provenance.style import Style
+
+    base = {
+        "version": "0.1.3",
+        "file": {"path": "x.flac", "size": 1.5e6, "codec": "flac",
+                 "sample_rate": 44100, "declared_bits": 24, "channels": 2,
+                 "duration_s": 180, "md5_zero": False},
+        "tags": {"album": "A", "artist": "B", "media": "", "encoder": "Lavf",
+                 "replaygain": ""},
+        "bitdepth": {"declared_bits": 24, "verdict": "GENUINE_24",
+                     "effective_bits": 23, "reasons": ["r1"],
+                     "levels": {"peak_dbfs": -3.2, "rms_dbfs": -10.1,
+                                "crest_db": 7.0, "clipped_pct": 0.0}},
+        "spectrum": {"cutoff65_hz": 12000, "cutoff90_hz": 20100,
+                     "energy_above_16k": 0.0, "energy_above_20k": 0.0,
+                     "energy_above_26k": 0.0, "brickwall_sharpness": 0.0,
+                     "max_cliff_db_per_khz": 76.0, "cliff_at_hz": 19751,
+                     "hf_slope_db_per_octave": -0.1, "top_band_db": -109.0},
+        "verdict": {"kind": "AUTHENTIC_LOSSLESS", "reasons": ["ok"]},
+        "origin": {"candidates": [
+            {"confidence": 0.6, "origin": "O1", "evidence": ["e1", "e2"]},
+            {"confidence": 0.4, "origin": "O2", "evidence": ["e1"]}],
+            "signals": ["s1"], "caveat": "c"},
+    }
+    checks = []
+    for kind in ["AUTHENTIC_LOSSLESS", "TRANSCODE", "POSSIBLE_TRANSCODE",
+                 "AMBIGUOUS_HI_BITRATE"]:
+        r = dict(base)
+        r["verdict"] = {"kind": kind, "reasons": ["a", "b"]}
+        out = render(r, Style(on=True))
+        checks.append((kind in out and "\x1b[" in out
+                       and "0.60" in out and "0.40" in out, kind))
+    r = dict(base)
+    r["origin"] = {"candidates": [], "signals": [], "caveat": "x"}
+    checks.append(("no candidates" in render(r, Style(on=True)),
+                   "empty candidates"))
+    checks.append(("\x1b[" not in render(base, Style(on=False)),
+                   "plain mode"))
+    r = dict(base)
+    r["file"]["md5_zero"] = True
+    checks.append(("unset" in render(r, Style(on=False)), "md5 unset"))
+
+    failures = 0
+    for ok, name in checks:
+        print(f"  {'PASS' if ok else 'FAIL'} render {name}")
+        failures += 0 if ok else 1
+    return failures
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("out_dir")
@@ -246,8 +299,12 @@ def main():
 
     print("\nclassify() branch checks:")
     failures += classify_unit_checks()
+
+    print("render() smoke checks:")
+    failures += render_checks()
     shutil.rmtree(tmp, ignore_errors=True)
-    print(f"\n{len(expected) + 6 - failures}/{len(expected) + 6} passed")
+    total = len(expected) + 6 + 7
+    print(f"\n{total - failures}/{total} passed")
     sys.exit(1 if failures else 0)
 
 
